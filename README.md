@@ -11,5 +11,5 @@ jobs/     Slurm job scripts
 docs/     notes and templates
 
 ## Author
-Barbara Becker
+Barbara Becker, 
 Student of Env. Science

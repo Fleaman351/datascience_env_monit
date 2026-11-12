@@ -13,3 +13,6 @@ docs/     notes and templates
 ## Author
 Barbara Becker, 
 Student of Env. Science
+
+## Date
+12.11.2026, B.Becker

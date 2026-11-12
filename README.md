@@ -12,3 +12,4 @@ docs/     notes and templates
 
 ## Author
 Barbara Becker
+Student of Env. Science

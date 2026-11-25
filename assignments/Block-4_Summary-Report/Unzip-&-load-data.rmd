@@ -1,0 +1,121 @@
+
+# Block 4 Assignment: Download your towers and write a data summary
+
+```{r}
+# check working directory
+getwd()
+```
+
+```{r}
+# loading packages
+library(readr)
+library(dplyr)
+library(knitr)
+library(lubridate)
+```
+
+
+
+## Part B: Read one half-hourly file cleanly (30 min)
+
+### B1. Look inside a zip
+
+Each zip holds several CSV files. Unzip one and list them.
+
+| File (pattern) | What is in it |
+| --- | --- |
+| `…_FLUXMET_HH_….csv` | Fluxes and meteorology every 30 minutes. **This assignment uses these.** |
+| `…_FLUXMET_DD/WW/MM/YY_….csv` | The same variables as daily, weekly, monthly, yearly values |
+| `…_ERA5_HH … YY_….csv` | ERA5 reanalysis weather downscaled to the site |
+| `…_BIF_….csv` | Site and ancillary information (BADM): location, IGBP, canopy height, LAI, soil … |
+| `…_BIFVARINFO_….csv` | For each variable: measurement height or depth, instrument |
+
+Read the file name: `AMF_US-Ha1_FLUXNET_FLUXMET_HH_1991-2025_v1.3_r1.csv` = hub, site ID, product, dataset, time step, years, ONEFlux code version, run.
+
+
+### B2. Read it in
+
+Three things must be right: **−9999 is missing**, **time stamps are read as text and converted to dates**, and **one row is one half hour**.
+The HH files have hundreds of columns; read only the ones you need.
+
+
+```{r}
+# defining variables which should be kept
+
+keep <- c("TIMESTAMP_START", "TIMESTAMP_END", "TA_F", "SW_IN_F", "VPD_F", "P_F",
+          "NETRAD", "G_F_MDS", "H_F_MDS", "H_F_MDS_QC", "LE_F_MDS", "LE_F_MDS_QC",
+          "NEE_VUT_REF", "NEE_VUT_REF_QC", "GPP_NT_VUT_REF", "RECO_NT_VUT_REF")
+```
+
+
+```{r}
+# defining the function
+
+read_hh <- function(zip_file) {
+
+  # get site ID from the ZIP filename
+  site <- basename(zip_file) |>
+    stringr::str_extract("[A-Z]{2}-[A-Za-z0-9]+")
+
+  # locate FLUXMET_HH CSV file (inside ZIP file)
+  hh_name <- grep(
+    "FLUXMET_HH",
+    unzip(zip_file, list = TRUE)$Name,
+    value = TRUE
+  )
+
+  # read CSV (directly from the ZIP file)
+  hh <- readr::read_csv(
+    unz(zip_file, hh_name),
+    na = "-9999",
+    col_types = readr::cols(
+      TIMESTAMP_START = "c",
+      TIMESTAMP_END = "c",
+      .default = "d"
+    )
+  )
+
+  # convert timestamps
+  hh <- hh |>
+    dplyr::mutate(
+      time = as.POSIXct(
+        TIMESTAMP_START,
+        format = "%Y%m%d%H%M",
+        tz = "UTC"
+      ),
+      site = site
+    )
+
+  return(hh)
+}
+```
+
+```{r}
+# Read all five towers into one table
+
+# Locate all ZIP files in data/raw/
+
+zip_files <- list.files(
+  "../data/raw",
+  pattern = "\\.zip$",
+  full.names = TRUE
+)
+
+# Read all towers and combine them
+hh_all <- purrr::map_dfr(zip_files, read_hh)
+```
+
+
+```{r}
+# Create processed data folder if it doesn't exist
+#
+dir.create("data/processed", recursive = TRUE, showWarnings = FALSE)
+
+# Save combined dataset
+
+readr::write_csv(hh_all, "../data/processed/hh_all.csv")
+
+
+
+
+```

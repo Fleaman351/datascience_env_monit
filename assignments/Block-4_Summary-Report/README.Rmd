@@ -1,0 +1,141 @@
+---
+title: "Untitled"
+author: "B.Becker"
+date: "2026-11-24"
+output: html_document
+---
+# Initial Exploration of Carbon Exchange Data
+# Summary Report
+
+## Project overview
+
+This project presents a preliminary comparison of carbon exchange patterns, seasonal variability, and data quality across five selected FLUXNET sites.
+
+The analysis includes the following sites:
+
+- **CZ-Lnz** – Deciduous Broadleaf Forest
+- **DE-RuS** – Cropland
+- **AU-DaS** – Woody Savanna
+- **CA-LP1** – Evergreen Needleleaf Forest
+- **JP-Tmd** – Grassland
+
+The results are presented in a Quarto HTML report.
+
+## Repository structure
+
+The FLUXNET analysis is located in the `Assignments/Block 4-Summary Report/` directory of the course repository.
+
+```text
+datascience_env_monit/
+│
+├── Assignments/
+│   ├── Block 2/
+│   └── Block 4-Summary Report/
+│       ├── README.md
+│       ├── Unzip-and-load-data.R
+│       ├── Report-4_Analysis.qmd
+│       └── Report-4_Analysis.html
+│
+├── docs/
+├── fluxforstudent/
+├── jobs/
+├── scripts/
+├── ssh-connection/
+└── README.md
+```
+
+**Folder and file descriptions:**
+
+- `README.md`: Analysis description and instructions for reproducing the analysis.
+- `Unzip-and-load-data.R`: Extracts the downloaded ZIP files, processes the raw data, and saves the resulting datasets as CSV files.
+- `Report-4_Analysis.qmd`: Main Quarto document containing the analysis and generating the HTML report.
+- `Report-4_Analysis.html`: Rendered HTML version of the report.
+
+## Data acquisition
+
+The raw data used in this analysis were obtained through the [FLUXNET Shuttle](https://fluxnet.org/data/fluxnet2015-dataset/).
+
+Five FLUXNET sites were selected:
+
+- CZ-Lnz
+- DE-RuS
+- AU-DaS
+- CA-LP1
+- JP-Tmd
+
+The data were obtained using the following FLUXNET Shuttle snapshot information:
+
+- **Snapshot:** `fluxnet_shuttle_snapshot_20261113T111801`
+- **Data version:** `v1.3`
+- **Run:** `r1`
+
+The corresponding site-specific dataset citations are provided in the References section of the report.
+
+The raw FLUXNET data are not included in this GitHub repository and must be obtained separately. Access may require registration or acceptance of the applicable data-use conditions.
+
+## Requirements
+
+The following software is required to reproduce the analysis:
+
+- [R](https://cran.r-project.org/)
+- [Quarto](https://quarto.org/docs/get-started/)
+- [RStudio](https://posit.co/download/rstudio-desktop/) (recommended)
+
+The R packages required for the analysis must be installed before running the scripts.
+
+## Reproducing the analysis
+
+### 1. Obtain the repository
+
+Clone the course repository to your local computer following the Git instructions provided for the course.
+
+Navigate to `Assignments/Block 4-Summary Report/`.
+
+### 2. Obtain the FLUXNET data
+
+Obtain the five required site-specific datasets through the FLUXNET Shuttle using the snapshot information provided above.
+
+If applicable, use `Download-FLUXNET-data.R` to assist with obtaining the datasets. Otherwise, download the ZIP files manually through the FLUXNET Shuttle.
+
+Place the downloaded ZIP files in the Analysis/data/raw/ directory. If this directory does not already exist, create it.
+
+The expected folder structure is:
+
+Analysis/
+├── data/
+│   ├── raw/          # Place the five FLUXNET ZIP files here
+│   └── processed/    # Generated processed data
+    └── snapshots/
+├── Scripts 
+    ├── Unzip-and-load-data.R
+    ├── Report-4_Analysis.qmd
+│  
+
+
+
+Note: The raw, processed, and snapshots directories are used to organize the input and output data. The processed directory is populated during data preparation.
+
+
+
+### 3. Prepare and load the data
+
+Run `Unzip-and-load-data.R` to extract the downloaded ZIP files and process the raw datasets.
+
+The processed data are saved as CSV files in `data/processed/`. These files serve as input for the subsequent analysis.
+
+### 4. Run the analysis and render the report
+
+Open `Report-4_Analysis.qmd` in RStudio and select **Render**.
+
+
+The resulting HTML report contains the analysis, figures, tables, and references.
+
+## Limitations
+
+- The analysis includes five individual sites, with one site representing each selected land-cover type. The results cannot necessarily be generalized to entire land-cover categories.
+- Measurement periods, data coverage, and data quality differ between sites.
+- CA-LP1 uses the CUT product for NEE, whereas the other four sites use the VUT product.
+
+## References
+
+The complete site-specific dataset citations and the reference for the FLUXNET processing methodology are provided in the References section of the report.

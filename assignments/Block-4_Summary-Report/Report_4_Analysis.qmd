@@ -1,0 +1,1190 @@
+
+---
+title: "Initial Exploration of Carbon Exchange Data"
+subtitel: "Summary Report"
+author: "Barbara Becker"
+date: today
+format:
+  html:
+    mainfont: "Arial, sans serif"
+    title-block-banner: false
+    page-layout: full
+    toc: true
+    toc-depth: 2
+    number-sections: false
+    embed-resources: true
+    code-fold: true
+    code-tools: true
+    theme: cosmo
+    fig-width: 12
+    fig-height: 7
+    dpi: 300
+execute:
+  warning: false
+---
+
+```{r}
+required_packages <- c(
+  "here",
+  "dplyr",
+  "tidyr",
+  "ggplot2",
+  "lubridate",
+  "knitr",
+  "kableExtra",
+  "maps",
+  "maps",
+  "readr",
+  "purrr"
+  )
+
+new_packages <- required_packages[
+  !required_packages %in% installed.packages()[, "Package"]
+]
+
+if (length(new_packages) > 0) {
+  install.packages(
+    new_packages,
+    repos = "https://cloud.r-project.org"
+  )
+}
+
+invisible(lapply(required_packages, library, character.only = TRUE))
+
+```
+
+# 1. Site Overview
+
+```{r}
+# locate the snapshot file
+
+# Locate snapshot CSV file
+
+snapshots <- list.files(
+  path = "../data/snapshots",
+  pattern = "^fluxnet_shuttle_snapshot_.*\\.csv$",
+  full.names = TRUE
+)
+
+# Read snapshot
+snapshot <- read.csv(snapshots)
+
+# Load processed FLUXNET data
+
+hh_all <- readr::read_csv(
+  "../data/processed/hh_all.csv",
+  na = c("", "NA", "-9999"),
+  show_col_types = FALSE,
+  lazy = TRUE
+)
+
+# create overview table
+
+sites_own <- sort(unique(hh_all$site))
+
+countries <- c(AU = "Australia", DE = "Germany", CZ = "Czech", JP = "Japan", CA = "Canada")
+
+sites <- snapshot |>
+  filter(site_id %in% sites_own) |>
+  distinct(site_id, .keep_all = TRUE) |>
+  mutate(country = countries[substr(site_id, 1, 2)])
+
+
+sites_table <- sites |>
+  select(
+    `Site ID` = site_id,
+    Name = site_name,
+    Country = country,
+    IGBP = igbp,
+    `Latitude (°)` = location_lat,
+    `Longitude (°)` = location_long,
+    `First year` = first_year,
+    `Last year` = last_year,
+    Hub = data_hub,
+    Citation = product_citation
+  )
+
+sites_table |>
+  knitr::kable(
+    format = "html",
+    digits = 2,
+    align = c("l", "l", "l", "c", "r", "r", "c", "c", "l", "l"),
+    booktabs = TRUE
+  ) |>
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+    full_width = FALSE,
+    position = "center",
+    font_size = 12
+  ) |>
+  kableExtra::column_spec(1, bold = TRUE) |>
+  kableExtra::row_spec(0, bold = TRUE, background = "#DCE6F1")
+```
+
+<div style="font-size: 0.85em; color: #555; text-align: left; margin-top: 18px; margin-bottom: 30px; line-height: 1.35;">
+
+**Table 1. Overview of the five selected FLUXNET sites.**
+Land-cover classification follows the International Geosphere-Biosphere Programme (IGBP) classification: WSA, woody savannas; ENF, evergreen needleleaf forests; DBF, deciduous broadleaf forests; CROP, croplands; and GRA, grasslands.<br>
+</div>
+
+
+```{r}
+# prepare site coordinates and label positions
+site_table <- sites %>%
+  transmute(
+    site_id,
+    latitude = location_lat,
+    longitude = location_long
+  ) %>%
+  mutate(
+    label_x = if_else(site_id == "CZ-Lnz", longitude - 4, longitude + 4),
+    label_y = if_else(site_id == "CZ-Lnz", latitude - 4, latitude + 4),
+    label_hjust = if_else(site_id == "CZ-Lnz", 1, 0)
+  )
+
+
+# create world map data
+world <- map_data("world")
+
+# plot 
+ggplot() +
+  geom_polygon(
+    data = world,
+    aes(x = long, y = lat, group = group),
+    fill = "grey94",
+    color = "grey75",
+    linewidth = 0.15
+  ) +
+  geom_point(
+    data = site_table,
+    aes(x = longitude, y = latitude),
+    color = "#A23B3B",
+    size = 2
+  ) +
+  geom_text(
+    data = site_table,
+    aes(
+      x = label_x,
+      y = label_y,
+      label = site_id,
+      hjust = label_hjust
+    ),
+    vjust = 0.5,
+    size = 3.1,
+    fontface = "plain",
+    color = "black"
+  ) +
+  coord_fixed(1.3) +
+  scale_x_continuous(
+    breaks = seq(-180, 180, by = 30),
+    minor_breaks = seq(-180, 180, by = 10),
+    expand = expansion(mult = 0)
+  ) +
+  scale_y_continuous(
+    breaks = seq(-90, 90, by = 15),
+    minor_breaks = seq(-90, 90, by = 5),
+    expand = expansion(mult = 0)
+  ) +
+  labs(
+    title = " ",
+    x = "Longitude (°)",
+    y = "Latitude (°)"
+  ) +
+  theme_bw(base_size = 11) +
+  theme(
+    plot.title = element_text(
+      size = 12,
+      face = "plain",
+      hjust = 0.5
+    ),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9, color = "black"),
+    panel.grid.major = element_line(
+      color = "grey85",
+      linewidth = 0.25
+    ),
+    panel.grid.minor = element_line(
+      color = "grey93",
+      linewidth = 0.15
+    ),
+    panel.border = element_rect(
+      color = "grey40",
+      linewidth = 0.35
+    )
+  )
+
+```
+<div style="font-size: 0.85em; color: #555; text-align: left; margin-top: 18px; margin-bottom: 30px; line-height: 1.35;">
+**Figure 1. Geographical locations of the five FLUXNET sites.**
+</div>
+
+# 2 Data coverage
+For each site and year, the proportion of half-hourly NEE observations in the highest quality class (QC = 0) was calculated based on the quality flag of the selected NEE product. The Variable u* Threshold (VUT) product was used for four sites, whereas the Constant u* Threshold (CUT) product was used for CA-LP1 because the VUT product was unavailable for this site.
+
+```{r}
+
+# calculate coverage
+
+coverage <- hh_all |>
+  mutate(
+    year = as.integer(format(time, "%Y")),
+    measured = case_when(
+      site == "CA-LP1" ~ NEE_CUT_REF_QC == 0,
+      TRUE ~ NEE_VUT_REF_QC == 0
+    )
+  ) |>
+  group_by(site, year) |>
+  summarise(
+    coverage = if (all(is.na(measured))) {
+      NA_real_
+    } else {
+      mean(measured, na.rm = TRUE)
+    },
+    .groups = "drop"
+  )
+
+# create heatmap 
+
+ggplot(coverage, aes(x = year, y = site, fill = coverage)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(
+    name = "NEE measured",
+    limits = c(0, 1),
+    labels = function(x) paste0(round(x * 100), "%")
+  ) +
+  scale_x_continuous(
+    breaks = sort(unique(coverage$year))
+  ) +
+  labs(
+    title = " ",
+    x = "Year",
+    y = " "
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1)
+  )
+```
+
+<div style="font-size: 0.85em; color: #555; text-align: left; margin-top: 18px; margin-bottom: 30px; line-height: 1.35;">
+**Figure 2. Temporal coverage of Net Ecosystem Exchange (NEE) measurements.**
+NEE_VUT data with quality flag 0 were used for all sites, except for CA, where NEE_CUT was used due to the unavailability of NEE_VUT_REF data. 
+</div>
+
+
+JP and AU: Longest measurement records and greatest temporal coverage. Both sites also show the highest data quality in their final years.
+CZ: Shorter measurement period, but a high proportion of valid NEE observations and data coverage extending to 2025.
+CA: Four years without NEE data, resulting in a substantial gap in the time series.
+
+Overall assessment: JP and AU provide the best temporal coverage and are therefore the most suitable sites for analyses prioritising long-term data availability. CZ offers a shorter but relatively high-quality and more recent record.
+
+
+# 3. Statistics 
+
+```{r}
+# define variables and add units
+vars_clim <- c(
+  TA_F    = "TA_F (°C)",
+  SW_IN_F = "SW_IN_F (W m⁻²)",
+  VPD_F   = "VPD_F (hPa)",
+  P_F     = "P_F (mm/year)"
+)
+
+
+
+# calculate statistics for each site and variable
+
+# exclude implausible temperature values (> 50°C and <-40°C)
+
+hh_all <- hh_all |>
+  mutate(
+    TA_F = if_else(TA_F > 50 | TA_F < -40, NA_real_, TA_F)
+  )
+
+
+stats_clim <- hh_all |>
+  select(site, all_of(names(vars_clim))) |>
+  pivot_longer(
+    cols = -site,
+    names_to = "var",
+    values_to = "value"
+  ) |>
+  summarise(
+    Mean = mean(value, na.rm = TRUE),
+    Min = min(value, na.rm = TRUE),
+    Max = max(value, na.rm = TRUE),
+    `% missing` = 100 * mean(is.na(value)),
+    .by = c(site, var)
+  )
+
+# calculate annual precipitation sums and their mean
+annual_prec <- hh_all |>
+  mutate(year = format(time, "%Y")) |>
+  summarise(
+    p_sum = if (all(is.na(P_F))) NA_real_ else sum(P_F, na.rm = TRUE),
+    .by = c(site, year)
+  ) |>
+  summarise(
+    p_annual = mean(p_sum, na.rm = TRUE),
+    .by = site
+  )
+
+
+# replace precipitation mean with mean annual precipitation
+stats <- stats_clim |>
+  left_join(annual_prec, by = "site") |>
+  mutate(
+    Mean = if_else(var == "P_F", p_annual, Mean)
+  ) |>
+  select(-p_annual)
+
+
+
+# create one table per site
+
+for (s in sites_own) {
+
+  tab <- stats |>
+    filter(site == s) |>
+    mutate(var = unname(vars_clim[var])) |>
+    select(var, Mean, Min, Max, `% missing`) |>
+    pivot_longer(
+      cols = -var,
+      names_to = "Statistic",
+      values_to = "Value"
+    ) |>
+    pivot_wider(
+      names_from = var,
+      values_from = Value
+    )}
+
+make_site_table <- function(s) {
+  tab <- stats |>
+    filter(site == s) |>
+    mutate(
+      Statistic = recode(
+        var,
+        TA_F = "Air temperature (°C)",
+        SW_IN_F = "Shortwave radiation (W m⁻²)",
+        VPD_F = "Vapour pressure deficit (hPa)",
+        P_F = "Precipitation (mm/Year)"
+      )
+    ) |>
+    select(Statistic, Mean, Min, Max, `% missing`)
+
+  knitr::kable(
+    tab,
+    format = "html",
+    digits = 1,
+    caption = s,
+    align = c("l", "r", "r", "r", "r"),
+    booktabs = TRUE
+  ) |>
+    kableExtra::kable_styling(
+      bootstrap_options = c("striped", "condensed"),
+      full_width = FALSE,
+      font_size = 10
+    )
+}
+
+make_site_table("AU-DaS")
+```
+
+::: {layout-ncol=2}
+
+
+```{r}
+make_site_table("CA-LP1")
+```
+
+```{r}
+make_site_table("CZ-Lnz")
+```
+
+```{r}
+make_site_table("DE-RuS")
+```
+
+```{r}
+make_site_table("JP-Tmd")
+```
+
+:::
+
+<div style="font-size: 0.85em; color: #555; text-align: left; margin-top: 18px; margin-bottom: 30px; line-height: 1.35;">
+**Table 2. Statistics of climatic characteristics.** Mean, minimum, and maximum values for air temperature, incoming radiation, and vapour pressure deficit are calculated from half-hourly measurements over the entire measurement period. For precipitation, these statistics are calculated from annual values for each year of the respective measurement period.
+</div>
+
+
+```{r}
+
+# define variables
+
+hh_all_CO <- hh_all |>
+  mutate(
+    NEE  = coalesce(NEE_VUT_REF, NEE_CUT_REF),
+    GPP  = coalesce(GPP_NT_VUT_REF, GPP_NT_CUT_REF),
+    RECO = coalesce(RECO_NT_VUT_REF, RECO_NT_CUT_REF)
+  )
+
+
+# Define variables and units
+vars_CO <- c(
+  NEE = "NEE (µmol CO₂ m⁻² s⁻¹)",
+  GPP = "GPP (µmol CO₂ m⁻² s⁻¹)",
+  RECO = "RECO (µmol CO₂ m⁻² s⁻¹)"
+)
+
+# Calculate statistics for each site and variable
+stats_CO <- hh_all_CO |>
+  select(site, all_of(names(vars_CO))) |>
+  pivot_longer(
+    cols = -site,
+    names_to = "var",
+    values_to = "value"
+  ) |>
+  summarise(
+    Mean = if (all(is.na(value))) NA_real_ else mean(value, na.rm = TRUE),
+    Min = if (all(is.na(value))) NA_real_ else min(value, na.rm = TRUE),
+    Max = if (all(is.na(value))) NA_real_ else max(value, na.rm = TRUE),
+    `% missing` = 100 * mean(is.na(value)),
+    .by = c(site, var)
+  )
+
+# Function to create one table per site
+make_site_table_CO <- function(s) {
+
+  tab <- stats_CO |>
+    filter(site == s) |>
+    mutate(
+      Statistic = recode(
+        var,
+        NEE = "NEE (µmol CO₂ m⁻² s⁻¹)",
+        GPP = "GPP (µmol CO₂ m⁻² s⁻¹)",
+        RECO = "RECO (µmol CO₂ m⁻² s⁻¹)"
+      )
+    ) |>
+    select(Statistic, Mean, Min, Max, `% missing`)
+
+  knitr::kable(
+    tab,
+    format = "html",
+    digits = 1,
+    caption = s,
+    align = c("l", "r", "r", "r", "r"),
+    booktabs = TRUE
+  ) |>
+    kableExtra::kable_styling(
+      bootstrap_options = c("striped", "condensed"),
+      full_width = FALSE,
+      font_size = 10
+    )
+}
+
+```
+
+
+::: {layout-ncol=2}
+
+```{r}
+make_site_table_CO("AU-DaS")
+
+```
+
+
+
+```{r}
+make_site_table_CO("CA-LP1")
+```
+
+
+```{r}
+make_site_table_CO("CZ-Lnz")
+```
+
+
+```{r}
+make_site_table_CO("DE-RuS")
+```
+
+```{r}
+make_site_table_CO("JP-Tmd")
+```
+:::
+
+
+<div style="font-size: 0.85em; color: #555; text-align: left; margin-top: 18px; margin-bottom: 30px; line-height: 1.35;">
+**Table 3. Statistics of carbon fluxes (NEE, GPP, and RECO).**<br>
+NEE values are based on the VUT product for all sites except CA-LP1, for which the CUT product was used due to the unavailability of VUT data<br>
+</div>
+
+
+
+
+```{r}
+
+# define variables and units
+
+vars_exch <- c(
+         H_F_MDS   = "H (W m⁻²)",
+          LE_F_MDS  = "LE (W m⁻²)")
+
+
+# calculate statistics for each site and variable
+
+stats_exch <- hh_all |>
+  select(site, all_of(names(vars_exch))) |>
+  pivot_longer(
+    cols = -site,
+    names_to = "var",
+    values_to = "value"
+  ) |>
+  summarise(
+    Mean = mean(value, na.rm = TRUE),
+    Min = min(value, na.rm = TRUE),
+    Max = max(value, na.rm = TRUE),
+    `% missing` = 100 * mean(is.na(value)),
+    .by = c(site, var)
+  )
+
+# create one table per site
+
+for (s in sites_own) {
+
+  tab <- stats_exch |>
+    filter(site == s) |>
+    mutate(var = unname(vars_exch[var])) |>
+    select(var, Mean, Min, Max, `% missing`) |>
+    pivot_longer(
+      cols = -var,
+      names_to = "Statistic",
+      values_to = "Value"
+    ) |>
+    pivot_wider(
+      names_from = var,
+      values_from = Value
+    )}
+```
+
+
+::: {layout-ncol=2}
+
+```{r}
+make_site_table_exch <- function(s) {
+  tab <- stats_exch |>
+    filter(site == s) |>
+    mutate(
+      Statistic = recode(
+        var,
+         H_F_MDS   = "H (W m⁻²)",
+         LE_F_MDS  = "LE (W m⁻²)"
+      )
+    ) |>
+    select(Statistic, Mean, Min, Max, `% missing`)
+
+  knitr::kable(
+    tab,
+    format = "html",
+    digits = 1,
+    caption = s,
+    align = c("l", "r", "r", "r", "r"),
+    booktabs = TRUE
+  ) |>
+    kableExtra::kable_styling(
+      bootstrap_options = c("striped", "condensed"),
+      full_width = FALSE,
+      font_size = 10
+    )
+}
+
+make_site_table_exch("AU-DaS")
+```
+
+```{r}
+make_site_table_exch("CA-LP1")
+```
+
+```{r}
+make_site_table_exch("CZ-Lnz")
+```
+
+```{r}
+make_site_table_exch("DE-RuS")
+```
+
+```{r}
+make_site_table_exch("JP-Tmd")
+```
+
+:::
+
+<div style="font-size: 0.85em; color: #555; text-align: left; margin-top: 18px; margin-bottom: 30px; line-height: 1.35;">
+**Table 4. statistics of energy fluxes (H and LE).**
+H and LE represent sensible and latent heat fluxes. Mean, minimum, and maximum values are calculated from half-hourly measurements over the entire measurement period for each site. <br>
+</div>
+
+
+
+# 4. Time series
+
+Half-hourly NEE, GPP and RECO measurements were aggregated into daily mean values for each site and converted from µmol CO₂ m⁻² s⁻¹ to g C m⁻² d⁻¹ using a conversion factor of 1.0378. Daily fluxes were calculated from the available half-hourly observations. Consequently, daily estimates may be less representative on days with incomplete data coverage. 
+NEE was obtained using the Variable u* Threshold (VUT) method for four sites and the Constant u* Threshold (CUT) method for CA-LP1, where VUT data were unavailable;
+
+```{r}
+
+# define variables used for carbon fluxes
+carbon_vars <- c(
+  "NEE_VUT_REF",
+  "NEE_CUT_REF",
+  "GPP_NT_VUT_REF",
+  "RECO_NT_VUT_REF"
+)
+
+# clean data and select the NEE version
+daily_carbon <- hh_all |>
+  mutate(
+    Date = as.Date(
+      as.character(TIMESTAMP_START),
+      format = "%Y%m%d%H%M"
+    ),
+    across(
+      all_of(carbon_vars),
+      ~ if_else(.x <= -9990, NA_real_, .x)
+    ),
+    NEE = if_else(
+      site == "CA-LP1" & is.na(NEE_VUT_REF),
+      NEE_CUT_REF,
+      NEE_VUT_REF
+    )
+  ) |>
+  select(
+    site, Date,
+    NEE,
+    GPP_NT_VUT_REF,
+    RECO_NT_VUT_REF
+  ) |>
+  pivot_longer(
+    cols = c(NEE, GPP_NT_VUT_REF, RECO_NT_VUT_REF),
+    names_to = "Variable",
+    values_to = "Flux"
+  ) |>
+  mutate(
+    Variable = recode(
+      Variable,
+      NEE = "NEE",
+      GPP_NT_VUT_REF = "GPP",
+      RECO_NT_VUT_REF = "RECO"
+    )
+  ) |>
+  group_by(site, Date, Variable) |>
+  summarise(
+    Daily_mean = if (all(is.na(Flux))) {
+      NA_real_
+    } else {
+      mean(Flux, na.rm = TRUE)
+    },
+    .groups = "drop"
+  ) |>
+  mutate(
+    Daily_flux = Daily_mean * 1.0378
+  )
+```
+
+
+
+```{r}
+#| fig-height: 12
+
+# plot daily carbon fluxes (one panel per site)
+ggplot(
+  daily_carbon,
+  aes(x = Date, y = Daily_flux, colour = Variable)
+) +
+  geom_line(linewidth = 0.35, na.rm = TRUE) +
+  facet_wrap(~ site, ncol = 1, scales = "free_y") +
+  scale_colour_manual(
+    values = c(
+      NEE = "#333333",
+      GPP = "#2C7FB8",
+      RECO = "#D95F0E"
+    )
+  ) +
+  labs(
+    x = "Date",
+    y = expression("Daily carbon flux (g C m"^{-2}*" d"^{-1}*")"),
+    colour = "Flux",
+    title = " "
+  ) +
+  theme_bw() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "bottom",
+    panel.grid.minor = element_blank()
+  ) +
+  theme(
+    # title
+    plot.title = element_text(size = 18, face = "bold"),
+
+    # axis titles
+    axis.title = element_text(size = 16),
+
+    # axis tick labels
+    axis.text = element_text(size = 14),
+
+    # legend title
+    legend.title = element_text(size = 15, face = "bold"),
+
+    # legend labels
+    legend.text = element_text(size = 14)
+  )
+
+```
+
+<div style="font-size: 0.85em; color: #555; text-align: left; margin-top: 12px; margin-bottom: 30px; line-height: 1.35;">
+**Figure 3. Daily carbon fluxes.**
+Time series of daily net ecosystem exchange (NEE), gross primary production (GPP), and ecosystem respiration (RECO) over the full measurement period at all five sites. Half-hourly measurements were aggregated into daily mean values and converted to g C m⁻² d⁻¹. Negative GPP values were included in the statistical analysis, as they may occur due to uncertainties in flux partitioning and data processing. Gaps indicate periods with missing or unavailable data.<br>
+</div>
+
+
+
+# 5. Diurnal cycles
+
+Mean diurnal cycles of NEE and latent heat flux (LE) were calculated by averaging half-hourly observations for each hour of the day, site and season. Seasons were assigned based on site latitude and hemisphere, with the seasons reversed for the southern hemisphere (AU-DaS) compared to the northern hemisphere.
+
+For sites in the Northern Hemisphere, winter was defined as December–February, spring as March–May, summer as June–August and autumn as September–November. For the southern hemisphere site (AU-DaS), the seasons were reversed by six months to account for opposite seasonal cycles.
+
+
+```{r}
+# hemisphere assignment based on site latitude
+site_hemisphere <- tibble(
+  site = c("AU-DaS", "CA-LP1", "CZ-Lnz", "DE-RuS", "JP-Tmd"),
+  hemisphere = c("South", "North", "North", "North", "North")
+)
+
+# clean data and extract date, month and hour
+diurnal_data <- hh_all |>
+  mutate(
+    timestamp = as.character(TIMESTAMP_START),
+    Date = as.Date(substr(timestamp, 1, 8), format = "%Y%m%d"),
+    Month = as.integer(substr(timestamp, 5, 6)),
+    Hour = as.integer(substr(timestamp, 9, 10)),
+    across(
+      c(NEE_VUT_REF, NEE_CUT_REF, LE_F_MDS),
+      ~ if_else(.x <= -9990, NA_real_, .x)
+    ),
+    NEE = if_else(
+      site == "CA-LP1" & is.na(NEE_VUT_REF),
+      NEE_CUT_REF,
+      NEE_VUT_REF
+    )
+  ) |>
+  left_join(site_hemisphere, by = "site") |>
+  mutate(
+    Season = case_when(
+      hemisphere == "North" & Month %in% c(12, 1, 2) ~ "Winter",
+      hemisphere == "North" & Month %in% c(3, 4, 5) ~ "Spring",
+      hemisphere == "North" & Month %in% c(6, 7, 8) ~ "Summer",
+      hemisphere == "North" & Month %in% c(9, 10, 11) ~ "Autumn",
+
+      hemisphere == "South" & Month %in% c(12, 1, 2) ~ "Summer",
+      hemisphere == "South" & Month %in% c(3, 4, 5) ~ "Autumn",
+      hemisphere == "South" & Month %in% c(6, 7, 8) ~ "Winter",
+      hemisphere == "South" & Month %in% c(9, 10, 11) ~ "Spring"
+    )
+  )
+
+# calculate mean hourly values for each site and season
+diurnal_mean <- diurnal_data |>
+  select(site, Hour, Season, NEE, LE_F_MDS) |>
+  pivot_longer(
+    cols = c(NEE, LE_F_MDS),
+    names_to = "Variable",
+    values_to = "Flux"
+  ) |>
+  mutate(
+    Variable = recode(
+      Variable,
+      NEE = "NEE",
+      LE_F_MDS = "LE"
+    )
+  ) |>
+  group_by(site, Season, Hour, Variable) |>
+  summarise(
+    Mean_flux = if (all(is.na(Flux))) {
+      NA_real_
+    } else {
+      mean(Flux, na.rm = TRUE)
+    },
+    .groups = "drop"
+  ) |>
+  mutate(
+    Season = factor(
+      Season,
+      levels = c("Spring", "Summer", "Autumn", "Winter")
+    ),
+    Variable = factor(Variable, levels = c("NEE", "LE"))
+  )
+
+# Plot diurnal cycles
+p_diurnal <- ggplot(
+  diurnal_mean,
+  aes(
+    x = Hour,
+    y = Mean_flux,
+    colour = Season,
+    group = Season
+  )
+) +
+  geom_hline(
+    yintercept = 0,
+    linetype = "dashed",
+    colour = "grey50",
+    linewidth = 0.4
+  ) +
+  geom_line(linewidth = 0.8, na.rm = TRUE) +
+  geom_point(size = 1.2, na.rm = TRUE) +
+  facet_grid(
+    Variable ~ site,
+    scales = "free_y"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 23, by = 4),
+    limits = c(0, 23)
+  ) +
+  scale_colour_manual(
+    values = c(
+      Spring = "#66A61E",
+      Summer = "#D95F02",
+      Autumn = "#E6AB02",
+      Winter = "#1F78B4"
+    )
+  ) +
+  labs(
+    x = "Hour of day",
+    y = expression("Mean flux ( "*mu*"mol m"^{-2}*" s"^{-1}*")"),
+    colour = "Season",
+    title = " ",
+    subtitle = " "
+  ) +
+  theme_bw(base_size = 11) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    axis.title = element_text(face = "bold"),
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    panel.spacing = unit(0.8, "lines"),
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  ) +
+ theme(
+    # title
+    plot.title = element_text(size = 18, face = "bold"),
+
+    # axis titles
+    axis.title = element_text(size = 16),
+
+    # axis tick labels
+    axis.text = element_text(size = 14),
+
+    # legend title
+    legend.title = element_text(size = 15, face = "bold"),
+
+    # legend labels
+    legend.text = element_text(size = 14)
+  )
+print(p_diurnal)
+
+```
+
+<div style="font-size: 0.85em; color: #555; text-align: left; margin-top: 18px; margin-bottom: 30px; line-height: 1.35;">
+**Figure 4. Seasonal patterns of mean diurnal cycles.**
+Mean diurnal cycles of net ecosystem exchange (NEE) and latent heat flux (LE) show their average daily variation across the different seasons at each site.** <br>
+</div>
+
+# 6. Energy Balance
+
+Energy balance closure was examined exemplarily at the DE-RuS site to evaluate the consistency of the measured energy fluxes. This analysis provides an indication of how completely the energy exchange between the surface and the atmosphere is captured by the eddy covariance measurements.
+
+Energy balance closure was assessed by comparing the sum of the turbulent heat fluxes (sensible heat flux, H, and latent heat flux, LE) with the available energy (net radiation minus ground heat flux), using only half-hourly observations with valid quality flags (QC = 0) for both H and LE.
+
+```{r}
+# energy balance closure
+
+# define variables
+required_vars <- c(
+  "site", "NETRAD", "G_F_MDS", "H_F_MDS", "LE_F_MDS",
+  "H_F_MDS_QC", "LE_F_MDS_QC"
+)
+
+# check that all required columns exist
+missing_vars <- setdiff(required_vars, names(hh_all))
+
+if (length(missing_vars) > 0) {
+  stop("Missing columns: ", paste(missing_vars, collapse = ", "))
+}
+
+# keep only the columns needed for this analysis
+balance_data <- hh_all |>
+  select(all_of(required_vars)) |>
+  mutate(
+    across(
+      c(NETRAD, G_F_MDS, H_F_MDS, LE_F_MDS),
+      ~ if_else(.x <= -9990, NA_real_, .x)
+    )
+  ) |>
+  filter(
+    H_F_MDS_QC == 0,
+    LE_F_MDS_QC == 0,
+    if_all(
+      c(NETRAD, G_F_MDS, H_F_MDS, LE_F_MDS),
+      ~ is.finite(.x)
+    )
+  ) |>
+  mutate(
+    Turbulent_flux = H_F_MDS + LE_F_MDS,
+    Available_energy = NETRAD - G_F_MDS
+  ) |>
+  select(site, Turbulent_flux, Available_energy)
+
+# count valid observations for each site
+site_counts <- balance_data |>
+  count(site, name = "n_valid") |>
+  arrange(desc(n_valid))
+
+if (nrow(site_counts) == 0) {
+  stop("No valid observations found for energy balance analysis.")
+}
+
+# select DE-RuS if data available
+selected_site <- if ("DE-RuS" %in% site_counts$site) {
+  "DE-RuS"
+} else {
+  site_counts$site[1]
+}
+
+# select observations for the chosen site
+plot_data <- balance_data |>
+  filter(site == selected_site)
+
+# linear regression using valid observations
+fit <- lm(
+  Turbulent_flux ~ Available_energy,
+  data = plot_data
+)
+
+slope <- coef(fit)[2]
+intercept <- coef(fit)[1]
+
+# regression information
+slope_label <- paste0(
+  "Slope = ", round(slope, 3),
+  "\nIntercept = ", round(intercept, 1),
+  "\nn = ", nrow(plot_data)
+)
+
+# random sample for plotting only
+set.seed(123)
+
+plot_points <- plot_data |>
+  slice_sample(
+    n = min(10000, nrow(plot_data))
+  )
+
+# energy balance plot
+p_energy <- ggplot(
+  plot_points,
+  aes(x = Available_energy, y = Turbulent_flux)
+) +
+  geom_point(
+    alpha = 0.25,
+    size = 0.7
+  ) +
+  geom_abline(
+    slope = 1,
+    intercept = 0,
+    linetype = "dashed",
+    linewidth = 0.9,
+    colour = "red"
+  ) +
+  geom_abline(
+    slope = slope,
+    intercept = intercept,
+    colour = "blue",
+    linewidth = 1
+  ) +
+  annotate(
+    "text",
+    x = Inf,
+    y = -Inf,
+    label = slope_label,
+    hjust = 1.1,
+    vjust = -0.5,
+    size = 4
+  ) +
+  coord_equal() +
+  labs(
+    title = paste("Energy balance closure:", selected_site),
+    x = expression(R[n] - G ~ (W ~ m^{-2})),
+    y = expression(H + LE ~ (W ~ m^{-2}))
+  ) +
+  theme_bw(base_size = 13) +
+  theme(
+    plot.title = element_text(
+      face = "bold",
+      hjust = 0.5
+    ),
+    panel.grid.minor = element_blank()
+  )
+
+print(p_energy)
+
+# clean up temporary objects
+rm(plot_points, plot_data, balance_data, fit)
+invisible(gc())
+
+
+```
+
+<div style="font-size: 0.85em; color: #555; text-align: left; margin-top: 12px; margin-bottom: 50px; line-height: 1.35;">
+**Figure 5. Energy balance closure at the DE-RuS FLUXNET site.**
+Turbulent energy fluxes are represented by sensible heat flux (H) and latent heat flux (LE), while available energy is calculated as net radiation minus ground heat flux (Rn − G). Only half-hourly observations with a quality flag of 0 for both H and LE were included. The solid line represents the 1:1 relationship, and the slope of the linear regression indicates the degree of energy balance closure.
+</div>
+
+For the DE-RuS cropland site, energy balance closure yielded a regression slope of 0.665 and an intercept of 8.5 W m⁻², based on 154,667 observations. The turbulent heat fluxes (H + LE) accounted for approximately 66.5% of the available energy (Rn − G), indicating an energy balance deficit of 33.5%. Such incomplete closure may result from measurement uncertainties, energy storage effects, or landscape heterogeneity. As an indicator of measurement consistency, the relatively low closure should be considered when interpreting the site's energy fluxes.
+
+
+# 7. Site Comparison and Conclusions
+
+```{r}
+
+# mean annual NEE for each site
+annual_nee <- daily_carbon |>
+  filter(Variable == "NEE") |>
+  mutate(Year = as.integer(format(Date, "%Y"))) |>
+  group_by(site, Year) |>
+  summarise(
+    annual_NEE = sum(Daily_flux, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  group_by(site) |>
+  summarise(
+    mean_annual_NEE = mean(annual_NEE, na.rm = TRUE),
+    years_available = n_distinct(Year),
+    .groups = "drop"
+  )
+
+# Seasonal amplitude based on monthly mean NEE
+seasonal_cycle <- daily_carbon |>
+  filter(Variable == "NEE") |>
+  mutate(Month = as.integer(format(Date, "%m"))) |>
+  group_by(site, Month) |>
+  summarise(
+    monthly_mean_NEE = mean(Daily_flux, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  group_by(site) |>
+  summarise(
+    seasonal_amplitude =
+      max(monthly_mean_NEE, na.rm = TRUE) -
+      min(monthly_mean_NEE, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Percentage of NEE observations with QC = 0
+# VUT is used for four sites; CUT for CA-LP1
+qc_summary <- hh_all |>
+  mutate(
+    NEE = if_else(
+      site == "CA-LP1",
+      NEE_CUT_REF,
+      NEE_VUT_REF
+    ),
+    NEE_QC = if_else(
+      site == "CA-LP1",
+      NEE_CUT_REF_QC,
+      NEE_VUT_REF_QC
+    )
+  ) |>
+  filter(!is.na(NEE), !is.na(NEE_QC)) |>
+  group_by(site) |>
+  summarise(
+    QC_0_percent = 100 * mean(NEE_QC == 0),
+    .groups = "drop"
+  )
+
+# combine results
+site_summary <- annual_nee |>
+  left_join(seasonal_cycle, by = "site") |>
+  left_join(qc_summary, by = "site") |>
+  mutate(
+    mean_annual_NEE = round(mean_annual_NEE, 1),
+    seasonal_amplitude = round(seasonal_amplitude, 1),
+    QC_0_percent = round(QC_0_percent, 1)
+  ) |>
+  arrange(mean_annual_NEE)
+
+# Create formatted HTML table
+knitr::kable(
+  site_summary,
+  format = "html",
+  digits = 1,
+  col.names = c(
+    "Site",
+    "Mean annual NEE",
+    "Years available",
+    "Seasonal amplitude",
+    "QC = 0 (%)"
+  ),
+  caption = " ",
+  align = c("l", "r", "r", "r", "r")
+) |>
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    full_width = FALSE,
+    font_size = 11
+  )
+```
+
+<div style="font-size: 0.85em; color: #555; text-align: left; margin-top: 18px; margin-bottom: 30px; line-height: 1.35;">
+**Table 5. Annual carbon exchange, seasonal variation and NEE data quality across sites.**<br>
+
+</div>
+
+**CZ-Lnz (Deciduous Broadleaf Forest)** showed the strongest mean annual net carbon uptake (−507.2 g C m⁻² yr⁻¹), indicating that it acted as a substantial carbon sink. It also exhibited the largest seasonal amplitude (8.0), reflecting the pronounced seasonal dynamics typical of deciduous forests, where leaf development and senescence strongly influence carbon exchange. Additionally, it had the highest proportion of high-quality observations (QC = 0; 46.8%), although its measurement period was the shortest (12 years).
+
+**DE-RuS (Cropland)** was the second strongest carbon sink (−480.6 g C m⁻² yr⁻¹), with a relatively high seasonal amplitude (5.5). This pronounced seasonality is consistent with crop growth cycles and agricultural management practices, which strongly influence carbon exchange throughout the year. Despite its 15-year measurement record, only 35.6% of observations belonged to the highest quality class.
+
+**AU-DaS (Woody Savanna)** showed moderate net carbon uptake (−353.5 g C m⁻² yr⁻¹) and relatively small seasonal variation (2.0). The combination of woody and herbaceous vegetation may contribute to its comparatively moderate seasonal dynamics. Its 19-year measurement period provides a relatively long-term perspective on carbon exchange.
+
+**CA-LP1 (Evergreen Needleleaf Forest)** exhibited relatively weak net carbon uptake (−128.5 g C m⁻² yr⁻¹) and the smallest seasonal amplitude (1.2). Its comparatively stable seasonal pattern is consistent with evergreen vegetation, which maintains foliage throughout the year, unlike deciduous forests. Despite its 18-year measurement period, its carbon uptake was considerably lower than that of CZ-Lnz. The proportion of high-quality observations was 41.8%. NEE was based on the CUT product because VUT data were unavailable.
+
+**JP-Tmd (Grassland)** was the only site with positive mean annual NEE (216.9 g C m⁻² yr⁻¹), indicating that it acted as a net carbon source over the analysed period. Its seasonal amplitude (4.0) reflects the seasonal dependence of grassland productivity on vegetation growth and climatic conditions. Despite its 19-year measurement record, it had the lowest proportion of high-quality observations (QC = 0; 34.4%).
+
+Limitations<br>
+Differences in data coverage, measurement period length, and data quality may affect the comparability of annual NEE estimates across sites. Additionally, the use of different NEE products (VUT and CUT) for CA-LP1 may introduce methodological differences. Finally, as only one site was selected per land-cover type, the results cannot necessarily be generalized to entire land-cover categories.
+
+
+Surprising finding<br>
+A surprising finding was the relatively weak carbon sink at the Canadian site (CA-LP1). Evergreen needleleaf forests retain their foliage throughout the year, potentially allowing photosynthesis beyond the main growing season when environmental conditions are suitable. Their long-lived vegetation can also store carbon in biomass over extended periods. However, CA-LP1 showed only moderate annual carbon uptake (−128.5 g C m⁻² yr⁻¹), indicating that these characteristics do not necessarily translate into high net carbon sequestration.
+
+# Data source
+
+Data were obtained through the FLUXNET Shuttle using snapshot `fluxnet_shuttle_snapshot_20261113T111801`, data version `v1.3`, and run `r1`. The corresponding site-specific dataset citations are provided in the References section.
+
+# References
+
+Beringer, J., Hutley, L., & Northwood, M. (2026). *Daly River Uncleared FLUXNET Release 2026_r1*. Version 2026_r1. Terrestrial Ecosystem Research Network (TERN). Dataset. https://doi.org/10.25901/nkbt-pa39
+
+Hirano, T., & Hirata, R. (2026). *Fluxnet Archive Product from Tomakomai Flux Research Site Disturbed, 2005–2023*. FLUXNET. https://hdl.handle.net/11676/0o-e7G4yJgKYUrpjjLe7w0lt
+
+Kowalska, N., Bellan, M., Czerný, R., Darenová, E., Fischer, M., Fischer, M., Foltýnová, L., Jocher, G., Krejza, J., Mensah, C., Nezval, O., Pavelka, M., Staník, K., Trusina, J., Šigut, L., & Šlížek, J. (2026). *Fluxnet Archive Product from Lanzhot, 2015-01-01–2026-09-06*. FLUXNET. https://hdl.handle.net/11676/nyTyuAYYMFqBPZDS9y0543dx
+
+Pastorello, G., Trotta, C., Canfora, E., et al. (2020). The FLUXNET2015 dataset and the ONEFlux processing pipeline for eddy covariance data. *Scientific Data, 7*, 225. https://doi.org/10.1038/s41597-020-0534-3
+
+Schmidt, M., Bagheri, S., Becker, N., Dolfus, D., Esser, O., Graf, A., Haustein, A., Kettler, M., Kummer, S., & Mattes, J. (2026). *Fluxnet Archive Product from Selhausen Juelich, 2011–2025*. FLUXNET. https://hdl.handle.net/11676/FBKUgeqFtfcDerDqdwv8lVSX
+
+Black, T. A. (2026). *AmeriFlux FLUXNET-1F CA-LP1 British Columbia – Mountain pine beetle-attacked lodgepole pine stand* (Version v1.3_r1, 2007–2024). AmeriFlux AMP. https://doi.org/10.17190/AMF/1832155
+
+# Acknowledgement
+
+FLUXNET data products were produced and harmonized by eddy covariance regional networks and data processing centers, including AmeriFlux, ChinaFlux, European Fluxes Database, ICOS, JapanFlux, KoFlux, OzFlux, SAEON, and TERN. These products also include a modified version of ERA5 hourly data provided by the Copernicus Climate Change Service.
